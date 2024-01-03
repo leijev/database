@@ -24,12 +24,9 @@ public class UserService {
     public List<User> getAllUsers() {
         return users;
     }
-<<<<<<< HEAD
-=======
 
     public void save(User user) {
         users.add(new User(5l, "testUser", "jfsdfjkd", 11));
     }
 
->>>>>>> update
 }
