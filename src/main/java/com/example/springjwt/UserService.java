@@ -25,4 +25,8 @@ public class UserService {
         return users;
     }
 
+    public void save(User user) {
+        users.add(new User(5l, "testUser", "jfsdfjkd", 11));
+    }
+
 }
