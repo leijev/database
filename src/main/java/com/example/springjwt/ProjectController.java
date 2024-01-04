@@ -1,38 +1,32 @@
 package com.example.springjwt;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 @RestController
 public class ProjectController {
-    private UserService userService = new UserService();
-    private Logger logger = Logger.getAnonymousLogger();
+    private List<String> messages = new ArrayList<>();
 
-    @GetMapping("/time")
-    public long test() {
-        logger.info("new user checkout");
-        return Instant.now().toEpochMilli();
+    @PostMapping("/send")
+    public ResponseEntity<?> send(@RequestParam String message) {
+        messages.add(message);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
-    @GetMapping("/bestUsers")
-    public List<User> getBestUser() {
-        return userService.sortUsers();
-    }
-
-    @GetMapping("/users")
-    public ResponseEntity<List<User>> getUsers() {
-        return new ResponseEntity<>(userService.getAllUsers(), HttpStatus.OK);
-    }
-
-    @GetMapping("/test")
-    public String test(HttpServletRequest httpServletRequest) {
-        return httpServletRequest.getRemoteAddr();
+    @GetMapping("/get")
+    public String getMessages() {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (String message : messages) {
+            stringBuilder.append("Anonym: " + message + "\n");
+            stringBuilder.append(" \n");
+        }
+        return stringBuilder.toString();
     }
 }
