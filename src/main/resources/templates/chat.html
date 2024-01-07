@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        #chatMessages {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        input,
+        button {
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+        }
+
+        p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <input type="text" id="usernameInput" class="form-control" placeholder="Enter your username">
+            </div>
+            <div class="col-md-6">
+                <input type="text" id="messageInput" class="form-control" placeholder="Type your message">
+            </div>
+            <div class="col-md-2">
+                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+
+        <div id="chatMessages" class="border rounded"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="https://cdn.sockjs.org/sockjs-1.5.0.min.js"></script>
+
+    <script>
+        var socket = new WebSocket('ws://localhost:8083/ws');
+        var stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/topic/chat', function(message) {
+                displayMessage(message);
+            });
+        });
+
+        function sendMessage() {
+            var messageInput = document.getElementById('messageInput');
+            var messageText = messageInput.value;
+
+            var usernameInput = document.getElementById('usernameInput');
+            var username = usernameInput.value;
+
+            if (messageText.trim() !== "") {
+                stompClient.send('/app/chat', {}, JSON.stringify({
+                    "username": username,
+                    "message": messageText
+                }));
+            }
+        }
+
+        function displayMessage(message) {
+            var chatMessagesDiv = document.getElementById('chatMessages');
+            chatMessagesDiv.innerHTML += '<p>' + message.body +  '</p>';
+        }
+    </script>
+</body>
+</html>
