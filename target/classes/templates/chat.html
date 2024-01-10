@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>WebSocket Chat</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+
     <style>
         body {
             padding: 20px;
@@ -18,73 +19,81 @@
             margin-bottom: 10px;
         }
 
-        input,
-        button {
-            margin-bottom: 10px;
-        }
 
-        button {
-            background-color: #007bff;
-            color: white;
-        }
-
-        p {
-            margin: 5px 0;
-        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="row">
-            <div class="col-md-4">
-                <input type="text" id="usernameInput" class="form-control" placeholder="Enter your username">
-            </div>
-            <div class="col-md-6">
-                <input type="text" id="messageInput" class="form-control" placeholder="Type your message">
-            </div>
-            <div class="col-md-2">
-                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
-            </div>
-        </div>
+<h1>TestWebSocket</h1>
+<input id="id" type="text" placeholder="chatId">
+<input id="username" type="text" placeholder="username">
 
-        <div id="chatMessages" class="border rounded"></div>
-    </div>
+<input id="message" type="text" placeholder="message">
+<button onclick="sendMessage()">connect</button>
 
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-    <script src="https://cdn.sockjs.org/sockjs-1.5.0.min.js"></script>
+<button onclick="private()">send</button>
+<br>
 
-    <script>
-        var socket = new WebSocket('wss://database-service-ki7m.onrender.com/ws');
-        var stompClient = Stomp.over(socket);
+<div id="chatMessages">
 
-        stompClient.connect({}, function(frame) {
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/topic/chat', function(message) {
-                displayMessage(message);
-            });
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script src="https://cdn.sockjs.org/sockjs-1.5.0.min.js"></script>
+
+<script>
+    var socket = new WebSocket('ws://localhost:8083/ws');
+    var stompClient = Stomp.over(socket);
+
+    stompClient.connect({}, function(frame) {
+       console.log('Connected ' + frame);
+       stompClient.subscribe('/topic/chat', function(message) {
+            displayMessage(message);
+       });
+
+    });
+
+    function private() {
+        var chatId = document.getElementById('id').value;
+        var messageText = document.getElementById('message').value;
+
+        var username = document.getElementById('username').value;
+
+        var headers = {
+            "id": chatId
+        };
+
+        stompClient.send('/app/chat/' + chatId, {}, JSON.stringify({
+            "username" : username,
+            "message": messageText
+        }));
+    }
+
+
+    function sendMessage() {
+        var username = document.getElementById('username').value;
+
+        let chatId = document.getElementById('id').value;
+
+        stompClient.send('/app/joinChat', {}, JSON.stringify({
+            "roomId" : chatId,
+            "username" : username
+        }));
+
+        stompClient.subscribe('/topic/chat/' + chatId, function(message) {
+            displayMessage(message);
         });
+    }
 
-        function sendMessage() {
-            var messageInput = document.getElementById('messageInput');
-            var messageText = messageInput.value;
 
-            var usernameInput = document.getElementById('usernameInput');
-            var username = usernameInput.value;
 
-            if (messageText.trim() !== "") {
-                stompClient.send('/app/chat', {}, JSON.stringify({
-                    "username": username,
-                    "message": messageText
-                }));
-            }
-        }
-
-        function displayMessage(message) {
+     function displayMessage(message) {
             var chatMessagesDiv = document.getElementById('chatMessages');
             chatMessagesDiv.innerHTML += '<p>' + message.body +  '</p>';
         }
-    </script>
+</script>
+
+
 </body>
 </html>

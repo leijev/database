@@ -1,9 +1,16 @@
 package com.example.springjwt.ws;
 
+import com.example.springjwt.ws.messages.Message;
+import com.example.springjwt.ws.rooms.CreateRoomRequest;
+import com.example.springjwt.ws.rooms.Room;
+import com.example.springjwt.ws.rooms.RoomService;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -11,6 +18,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,54 +31,66 @@ import java.util.logging.Logger;
 public class WebsocketController
 {
     private final SimpMessagingTemplate simpMessagingTemplate;
-    private final Map<String, String> currentMembers = new HashMap<>();
+    private final RoomService roomService;
 
-    private Logger logger = Logger.getAnonymousLogger();
+    @MessageMapping("/joinChat")
+    public void joinChat(CreateRoomRequest createRoomRequest, SimpMessageHeaderAccessor simpMessageHeaderAccessor) {
+        String roomId = createRoomRequest.getRoomId();
+        String username = createRoomRequest.getUsername();
 
-    @MessageMapping("/chat")
-    public void sendMessageToChat(Message message, SimpMessageHeaderAccessor simpMessageHeaderAccessor) {
-        String username = (String) simpMessageHeaderAccessor.getSessionAttributes().get("username");
+        if (simpMessageHeaderAccessor.getSessionAttributes().get("currentRoomId") != null) {
+            String currentRoomId = (String) simpMessageHeaderAccessor.getSessionAttributes().get("currentRoomId");
+            roomService.removeUserFromRoom(currentRoomId, username);
 
-        if (username == null) {
-            username = message.getUsername();
-            simpMessageHeaderAccessor.getSessionAttributes().put("username", username);
+            simpMessagingTemplate.convertAndSend(
+                    "/topic/chat/" + currentRoomId, String.format("%s disconnected", username)
+            );
         }
 
-        String hashId = simpMessageHeaderAccessor.getSessionId();
-        Message sendMessage = new Message(username, message.getMessage());
+        if (roomService.getRoom(roomId) == null) {
+            roomService.createRoom(roomId).addUser(username);
+        } else {
+            roomService.getRoom(roomId).addUser(username);
+        }
 
-        if (checkIdentity(hashId, username) || currentMembers.size() < 1) {
-            currentMembers.put(hashId, username);
-            simpMessagingTemplate.convertAndSend("/topic/chat", sendMessage.generateMessage());
+        simpMessagingTemplate.convertAndSend(
+                "/topic/chat/" + roomId, String.format("%s connected", username)
+        );
+
+        simpMessageHeaderAccessor.getSessionAttributes().put("currentRoomId", roomId);
+    }
+
+    @MessageMapping("/chat/{id}")
+    public void sendMessage(@DestinationVariable("id") String roomId, @Payload Message message, SimpMessageHeaderAccessor simpMessageHeaderAccessor) {
+        Room room = roomService.getRoom(roomId);
+        if (room == null || !room.getUsers().contains(message.getUsername())) {
             return;
         }
 
-        simpMessagingTemplate.convertAndSend("/topic/chat", currentMembers.get(hashId) + ": " + message.getMessage());
-        logger.info("new message received: " + currentMembers.get(hashId));
-    }
-
-    public boolean checkIdentity(String hashId, String username) {
-        return currentMembers.get(hashId) == username ? false : true;
-    }
-
-    @EventListener
-    public void handleSessionDisconnectEvent(SessionDisconnectEvent sessionDisconnectEvent) {
-        logger.info("session disconnect event");
-
-        StompHeaderAccessor stompHeaderAccessor = StompHeaderAccessor.wrap(sessionDisconnectEvent.getMessage());
-        Map<String, Object> sessionAttributes = stompHeaderAccessor.getSessionAttributes();
-
-        String username = (String) sessionAttributes.get("username");
-        if (sessionAttributes == null || username == null) {
+        String currentRoomId = (String) simpMessageHeaderAccessor.getSessionAttributes().get("currentRoomId");
+        if (currentRoomId.equals(roomId)) {
+            simpMessagingTemplate.convertAndSend(
+                    "/topic/chat/" + roomId, message.generateMessage()
+            );
             return;
         }
 
-        Message message = new Message("Server", username + " disconnect from room");
-        simpMessagingTemplate.convertAndSend("/topic/chat", message.generateMessage());
+        simpMessagingTemplate.convertAndSend("/topic/chat", "Connect to this room to send messages");
+    }
+
+    @MessageMapping("/online")
+    public void online(String text) {
+        simpMessagingTemplate.convertAndSend("/topic/online", roomService.getRooms().size());
     }
 
     @EventListener
     public void handleSessionConnectEvent(SessionConnectEvent sessionConnectEvent) {
-        simpMessagingTemplate.convertAndSend("/topic/chat", "New client connected");
+        System.out.println("new session connect event");
     }
+
+    @EventListener
+    public void handleSessionDisconnectEvent(SessionDisconnectEvent sessionDisconnectEvent) {
+        System.out.println("session disconnect event");
+    }
+
 }
