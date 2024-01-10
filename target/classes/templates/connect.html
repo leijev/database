@@ -60,7 +60,7 @@
     <script src="https://cdn.sockjs.org/sockjs-1.5.0.min.js"></script>
 
 <script>
-    var socket = new WebSocket('ws://localhost:8083/ws');
+    var socket = new WebSocket('wss://database-service-ki7m.onrender.com/ws');
     var stompClient = Stomp.over(socket);
 
     stompClient.connect({}, function(frame) {
